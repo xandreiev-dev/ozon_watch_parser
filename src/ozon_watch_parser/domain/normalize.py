@@ -18,7 +18,11 @@ from .watch_fields import (
 )
 
 
-def normalize_listing_item(item: ListingItem, brand_hint: str = "") -> dict:
+def normalize_listing_item(
+    item: ListingItem,
+    brand_hint: str = "",
+    condition_hint: str = "",
+) -> dict:
     title = item.title or ""
     description = ""
     article = article_from_url(item.url)
@@ -26,6 +30,8 @@ def normalize_listing_item(item: ListingItem, brand_hint: str = "") -> dict:
     delivery_days = (parsed_delivery - date.today()).days if parsed_delivery else None
     price = coerce_price(item.price)
     discount_price = coerce_price(item.discount_price)
+    if price and discount_price and price > discount_price * 3:
+        price = discount_price
     source_text = " ".join([title, item.url])
 
     brand = extract_brand(title, description, brand_hint=brand_hint)
@@ -51,7 +57,7 @@ def normalize_listing_item(item: ListingItem, brand_hint: str = "") -> dict:
         "Доставка": item.delivery_date,
         "brand": brand,
         "model": extract_model(title, description),
-        "condition": extract_condition(title, description) or "new",
+        "condition": extract_condition(title, description) or condition_hint,
         "size": extract_size(title, description),
         "color": extract_color(title, description),
         "warranty": extract_warranty(title, description),

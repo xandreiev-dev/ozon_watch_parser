@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import subprocess
 import tempfile
@@ -11,6 +12,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+
+
+logger = logging.getLogger(__name__)
 
 
 STEALTH_INIT_SCRIPT = r"""
@@ -60,9 +64,10 @@ class BrowserManager:
             return False
 
     async def wait_for_cdp(self, cdp_url: str, attempts: int = 15) -> bool:
-        for _ in range(attempts):
+        for attempt in range(1, attempts + 1):
             if self.cdp_endpoint_ready(cdp_url):
                 return True
+            logger.info("Жду CDP endpoint %s, попытка %s/%s", cdp_url, attempt, attempts)
             await asyncio.sleep(1)
         return False
 
@@ -92,6 +97,7 @@ class BrowserManager:
             "--no-default-browser-check",
             "--start-maximized",
         ]
+        logger.info("Запускаю отдельный Chrome для CDP на порту %s", port)
         self.chrome_process = subprocess.Popen(args)
         self._owns_browser = True
 
@@ -121,6 +127,7 @@ class BrowserManager:
         if not ready:
             raise RuntimeError(f"Не удалось дождаться CDP endpoint {self.settings.cdp_url}")
 
+        logger.info("Подключаюсь к Chrome через CDP: %s", self.settings.cdp_url)
         self.browser = await self.playwright.chromium.connect_over_cdp(self.settings.cdp_url)
         self.context = self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()

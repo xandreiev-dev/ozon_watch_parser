@@ -195,6 +195,41 @@ def extract_garmin_model(title: str, description: str = "") -> str:
 def extract_apple_model(title: str, description: str = "") -> str:
     lower = clean_text(f"{title or ''} {description or ''}").lower()
     series_group = "|".join(VALID_APPLE_SERIES)
+
+    ultra_match = re.search(r"\bwatch\s+ultra\s*(2|3)?\b", lower, flags=re.IGNORECASE)
+    if ultra_match:
+        suffix = ultra_match.group(1) or ""
+        return clean_text(f"Apple Watch Ultra {suffix}")
+
+    se_match = re.search(
+        r"\bwatch\s+(?:series\s+)?se\s*(?:gen\s*)?(2|3|2022|2024|2025)?\b",
+        lower,
+        flags=re.IGNORECASE,
+    )
+    if se_match:
+        raw_version = se_match.group(1) or ""
+        if raw_version in {"2", "2022", "2024"}:
+            return "Apple Watch SE 2"
+        if raw_version in {"3", "2025"}:
+            return "Apple Watch SE 3"
+        return "Apple Watch SE"
+
+    series_match = re.search(
+        rf"\bwatch\s+series\s*({series_group})\b",
+        lower,
+        flags=re.IGNORECASE,
+    )
+    if series_match:
+        return f"Apple Watch Series {series_match.group(1)}"
+
+    compact_series_match = re.search(
+        rf"\bwatch\s+series({series_group})\b",
+        lower,
+        flags=re.IGNORECASE,
+    )
+    if compact_series_match:
+        return f"Apple Watch Series {compact_series_match.group(1)}"
+
     patterns = [
         rf"(apple watch ultra\s*(?:2|3)?)\b",
         rf"(apple watch se(?:\s*(?:2|3|gen\s*2|gen\s*3|2022|2024))?)\b",

@@ -58,7 +58,10 @@ class StreamingXlsxWriter:
             self._save()
 
 
-def aggregate_brand_exports(export_dir: str | Path, run_date: date | None = None) -> tuple[Path | None, int]:
+def aggregate_brand_exports(
+    export_dir: str | Path,
+    run_date: date | None = None,
+) -> tuple[Path | None, int]:
     export_path = Path(export_dir)
     expected_names = {brand_file_name(brand) for brand in BRAND_URLS}
     files = sorted(path for path in export_path.iterdir() if path.is_file() and path.name in expected_names)
@@ -88,7 +91,7 @@ def aggregate_brand_exports(export_dir: str | Path, run_date: date | None = None
     ordered_columns.extend(column for column in combined.columns if column not in ordered_columns)
     combined = combined[ordered_columns]
 
-    out_path = export_path / final_output_file_name(run_date)
+    out_path = export_path / final_output_file_name(run_date=run_date)
     combined.to_excel(out_path, index=False, engine="openpyxl")
 
     for path in files:

@@ -39,6 +39,7 @@ EXTRACT_LISTING_JS = r"""
       const aria = link.getAttribute('aria-label') || link.getAttribute('title') || '';
       if (aria && titleNeedle.test(aria)) title = aria.trim();
     }
+    if (!title) return;
 
     const priceMatches = [...txt.matchAll(/([\d\s\u00a0]+)\s*₽/g)]
       .map(m => parseInt(m[1].replace(/[\s\u00a0]/g, ''), 10))
@@ -91,15 +92,68 @@ class ListingExtractor:
     async def human_delay(self, minimum: float = 0.4, maximum: float = 1.2) -> None:
         await asyncio.sleep(random.uniform(minimum, maximum))
 
+    @staticmethod
+    def _is_transient_page_error(exc: Exception) -> bool:
+        message = str(exc)
+        transient_markers = (
+            "Execution context was destroyed",
+            "most likely because of a navigation",
+            "Cannot read properties of null",
+            "navigation",
+            "Target closed",
+            "has been closed",
+        )
+        return any(marker in message for marker in transient_markers)
+
+    async def _wait_for_body(self, attempts: int = 6) -> bool:
+        for _ in range(attempts):
+            try:
+                ready = await self.page.evaluate("() => Boolean(document.body)")
+                if ready:
+                    return True
+            except Exception as exc:
+                if not self._is_transient_page_error(exc):
+                    raise
+            await self.human_delay(0.5, 1.0)
+        return False
+
     async def check_blocked(self) -> bool:
-        title = await self.page.title()
-        body_text = await self.page.evaluate("() => document.body ? document.body.innerText.slice(0, 500) : ''")
+        title = ""
+        body_text = ""
+        for _ in range(4):
+            try:
+                title = await self.page.title()
+                body_text = await self.page.evaluate("() => document.body ? document.body.innerText.slice(0, 500) : ''")
+                break
+            except Exception as exc:
+                if not self._is_transient_page_error(exc):
+                    raise
+                await self.human_delay(0.6, 1.2)
         if "Доступ ограничен" in title or "Доступ ограничен" in body_text:
             return True
         return "Подтвердите" in body_text and "робот" in body_text.lower()
 
+    async def _scroll_to_bottom(self, attempts: int = 4) -> bool:
+        for _ in range(attempts):
+            try:
+                return await self.page.evaluate(
+                    """
+                    () => {
+                      if (!document.body) return false;
+                      window.scrollTo(0, document.body.scrollHeight);
+                      return true;
+                    }
+                    """
+                )
+            except Exception as exc:
+                if not self._is_transient_page_error(exc):
+                    raise
+                await self.human_delay(0.5, 1.0)
+        return False
+
     async def fetch_listing_page(self, url: str, brand_hint: str = "", on_new_items=None) -> list[ListingItem]:
         await self.page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        await self._wait_for_body()
         await self.human_delay(3, 5)
 
         if await self.check_blocked():
@@ -119,7 +173,7 @@ class ListingExtractor:
                     return [ListingItem.from_raw(raw) for raw in raw_items if raw.get("url")]
                 except Exception as exc:
                     last_error = exc
-                    if attempt < retries and ("Execution context was destroyed" in str(exc) or "navigation" in str(exc)):
+                    if attempt < retries and self._is_transient_page_error(exc):
                         await self.human_delay(0.8, 1.5)
                         continue
                     raise
@@ -143,9 +197,13 @@ class ListingExtractor:
         empty_growth_streak = 0
 
         for _ in range(max_scrolls):
-            await self.page.mouse.wheel(0, 600)
+            try:
+                await self.page.mouse.wheel(0, 600)
+            except Exception as exc:
+                if not self._is_transient_page_error(exc):
+                    raise
             await self.human_delay(0.4, 0.9)
-            await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await self._scroll_to_bottom()
             await self.human_delay(0.8, 1.5)
             items = await wait_for_settle()
 
