@@ -10,6 +10,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib
 
 from ozon_watch_parser.config.brands import BRAND_URLS
+from ozon_watch_parser.utils.url import normalize_ozon_url
 
 
 @dataclass(slots=True)
@@ -27,9 +28,9 @@ def _as_url_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        return [value.strip()] if value.strip() else []
+        return [normalize_ozon_url(value.strip())] if value.strip() else []
     if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
+        return [normalize_ozon_url(str(item).strip()) for item in value if str(item).strip()]
     return []
 
 

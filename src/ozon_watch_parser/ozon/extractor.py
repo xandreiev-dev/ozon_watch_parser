@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import random
 
+from collections.abc import Awaitable, Callable
+
 from playwright.async_api import Page
 
 from .models import ListingItem
@@ -86,8 +88,13 @@ EXTRACT_LISTING_JS = r"""
 
 
 class ListingExtractor:
-    def __init__(self, page: Page):
+    def __init__(
+        self,
+        page: Page,
+        set_location: Callable[[], Awaitable[None]] | None = None,
+    ):
         self.page = page
+        self.set_location = set_location
 
     async def human_delay(self, minimum: float = 0.4, maximum: float = 1.2) -> None:
         await asyncio.sleep(random.uniform(minimum, maximum))
@@ -154,6 +161,8 @@ class ListingExtractor:
     async def fetch_listing_page(self, url: str, brand_hint: str = "", on_new_items=None) -> list[ListingItem]:
         await self.page.goto(url, wait_until="domcontentloaded", timeout=45000)
         await self._wait_for_body()
+        if self.set_location:
+            await self.set_location()
         await self.human_delay(3, 5)
 
         if await self.check_blocked():

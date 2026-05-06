@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import urllib.error
@@ -15,6 +16,14 @@ from playwright.async_api import Browser, BrowserContext, Page, Playwright, asyn
 
 
 logger = logging.getLogger(__name__)
+
+MOSCOW_GEOLOCATION = {
+    "latitude": 55.7558,
+    "longitude": 37.6173,
+}
+
+OZON_GEOLOCATION_ORIGIN = "https://www.ozon.ru"
+MOSCOW_LOCATION_QUERY = "141-99-90"
 
 
 STEALTH_INIT_SCRIPT = r"""
@@ -54,6 +63,7 @@ class BrowserManager:
         self.page: Page | None = None
         self.chrome_process: subprocess.Popen | None = None
         self._owns_browser = False
+        self._moscow_location_applied = False
 
     @staticmethod
     def cdp_endpoint_ready(cdp_url: str) -> bool:
@@ -130,6 +140,7 @@ class BrowserManager:
         logger.info("Подключаюсь к Chrome через CDP: %s", self.settings.cdp_url)
         self.browser = await self.playwright.chromium.connect_over_cdp(self.settings.cdp_url)
         self.context = self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
+        await self.apply_moscow_geolocation()
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
 
     async def _setup_owned_browser(self) -> None:
@@ -156,7 +167,156 @@ class BrowserManager:
             },
         )
         await self.context.add_init_script(STEALTH_INIT_SCRIPT)
+        await self.apply_moscow_geolocation()
         self.page = await self.context.new_page()
+
+    async def apply_moscow_geolocation(self) -> None:
+        if not self.context:
+            return
+        try:
+            await self.context.grant_permissions(
+                ["geolocation"],
+                origin=OZON_GEOLOCATION_ORIGIN,
+            )
+            await self.context.set_geolocation(MOSCOW_GEOLOCATION)
+        except Exception as exc:
+            logger.debug("Не удалось выставить geolocation Москвы: %s", exc)
+
+    async def set_moscow_location_via_ui(self) -> None:
+        if self._moscow_location_applied or not self.page:
+            return
+
+        await self.apply_moscow_geolocation()
+
+        async def safe_click(locator, timeout: int = 3000) -> bool:
+            try:
+                await locator.first.click(force=True, timeout=timeout)
+                return True
+            except Exception:
+                return False
+
+        for _ in range(2):
+            try:
+                await self.page.keyboard.press("Escape")
+            except Exception:
+                pass
+            await asyncio.sleep(0.35)
+
+        opener_candidates = (
+            self.page.get_by_role(
+                "button",
+                name=re.compile(r"^(Краснодар|Москва|Укажите адрес|Пункт Ozon)", re.I),
+            ),
+            self.page.get_by_role(
+                "button",
+                name=re.compile(r"(Выбрать на карте|Добавить адрес|Укажите адрес|Пункт Ozon)", re.I),
+            ),
+        )
+
+        opened = False
+        for locator in opener_candidates:
+            opened = await safe_click(locator)
+            if opened:
+                await asyncio.sleep(3)
+                break
+
+        for locator in (
+            self.page.get_by_role(
+                "button",
+                name=re.compile(r"(Выбрать на карте|Выберите адрес доставки)", re.I),
+            ),
+            self.page.get_by_role(
+                "button",
+                name=re.compile(r"(Самовывоз|Пункт выдачи|Постамат)", re.I),
+            ),
+        ):
+            if await safe_click(locator):
+                opened = True
+                await asyncio.sleep(2)
+
+        if not opened:
+            for _ in range(2):
+                if await safe_click(opener_candidates[0]):
+                    opened = True
+                    await asyncio.sleep(1.7)
+                    break
+
+        if not opened:
+            logger.warning("Не удалось открыть виджет выбора адреса Ozon")
+            return
+
+        search_input = None
+        search_candidates = (
+            self.page.locator('form.checkout_a7n div.sdk[label="Искать на карте"] textarea'),
+            self.page.locator('div[data-widget="addressEditForm"] div.sdk[label="Искать на карте"] textarea'),
+            self.page.locator('div.sdk[label="Искать на карте"] textarea'),
+        )
+        for _ in range(8):
+            for candidate in search_candidates:
+                try:
+                    if await candidate.count():
+                        search_input = candidate.first
+                        break
+                except Exception:
+                    continue
+            if search_input:
+                break
+            await asyncio.sleep(0.5)
+
+        if search_input:
+            for _ in range(2):
+                try:
+                    await search_input.click(timeout=5000)
+                    await search_input.press("Control+A")
+                    await search_input.press("Backspace")
+                    await search_input.type(MOSCOW_LOCATION_QUERY, delay=50)
+                    await asyncio.sleep(1.7)
+                    break
+                except Exception:
+                    await asyncio.sleep(0.5)
+
+        determine_button = self.page.get_by_role(
+            "button",
+            name=re.compile(r"Определить местоположение", re.I),
+        )
+        try:
+            await determine_button.first.click(force=True, timeout=5000)
+        except Exception:
+            try:
+                await self.page.keyboard.press("Enter")
+            except Exception:
+                pass
+        await asyncio.sleep(1.5)
+
+        pickup_button = self.page.get_by_role(
+            "button",
+            name=re.compile(r"Заберу отсюда", re.I),
+        )
+        for _ in range(8):
+            try:
+                if await pickup_button.count():
+                    await pickup_button.first.click(force=True, timeout=5000)
+                    await asyncio.sleep(1.2)
+                    break
+            except Exception:
+                pass
+
+            try:
+                await determine_button.first.click(force=True, timeout=3000)
+            except Exception:
+                try:
+                    await self.page.keyboard.press("Enter")
+                except Exception:
+                    pass
+            await asyncio.sleep(1.2)
+
+        try:
+            await self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+        except Exception:
+            pass
+        await asyncio.sleep(0.8)
+        self._moscow_location_applied = True
+        logger.info("Регион Ozon выставлен через UI: Москва")
 
     async def close(self) -> None:
         try:

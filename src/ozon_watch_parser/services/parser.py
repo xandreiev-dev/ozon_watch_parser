@@ -35,7 +35,10 @@ class OzonWatchParser:
 
     async def setup(self) -> None:
         page = await self.browser.setup()
-        self.extractor = ListingExtractor(page)
+        self.extractor = ListingExtractor(
+            page,
+            set_location=self.browser.set_moscow_location_via_ui,
+        )
 
     async def close(self) -> None:
         await self.browser.close()

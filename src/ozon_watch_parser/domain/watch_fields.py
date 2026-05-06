@@ -13,6 +13,7 @@ WATCH_BRANDS = [
     ("google", "Google"),
     ("pixel", "Google"),
     ("oneplus", "OnePlus"),
+    ("vivo", "vivo"),
 ]
 
 COLOR_KEYWORDS = [
@@ -280,6 +281,7 @@ def extract_model(title: str, description: str = "") -> str:
         r"((?:xiaomi|redmi) watch[a-z0-9\- ]*)",
         r"(google pixel watch\s*\d*)",
         r"(oneplus watch\s*\d*)",
+        r"(vivo watch\s*[a-z0-9\- ]*)",
     ]
     for pattern in patterns:
         match = re.search(pattern, lower, flags=re.IGNORECASE)

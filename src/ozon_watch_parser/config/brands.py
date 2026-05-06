@@ -8,6 +8,7 @@ BRAND_URLS = {
     "xiaomi": "https://www.ozon.ru/category/smart-chasy-15516/xiaomi-32686750/?sorting=price",
     "google": "https://www.ozon.ru/category/smart-chasy-15516/google-76075458/?sorting=price",
     "oneplus": "https://www.ozon.ru/category/smart-chasy-15516/oneplus-137673880/?sorting=price",
+    "vivo": "https://www.ozon.ru/category/umnye-chasy-15516/vivo-161505158/?sorting=price",
 }
 
 BRAND_DISPLAY_NAMES = {
@@ -20,6 +21,7 @@ BRAND_DISPLAY_NAMES = {
     "xiaomi": "Xiaomi",
     "google": "Google",
     "oneplus": "OnePlus",
+    "vivo": "vivo",
 }
 
 BRAND_MIN_CARDS = {

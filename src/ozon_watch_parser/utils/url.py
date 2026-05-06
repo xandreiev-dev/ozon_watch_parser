@@ -2,6 +2,17 @@ import re
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 
+def normalize_ozon_url(url: str) -> str:
+    if not url:
+        return ""
+    parsed = urlparse(url.strip())
+    if parsed.netloc.lower() in {"ozon.kz", "www.ozon.kz"}:
+        parsed = parsed._replace(scheme="https", netloc="www.ozon.ru")
+    elif parsed.netloc.lower() == "ozon.ru":
+        parsed = parsed._replace(scheme="https", netloc="www.ozon.ru")
+    return parsed.geturl()
+
+
 def build_page_url(base_url: str, page_num: int) -> str:
     parsed = urlparse(base_url)
     params = dict(parse_qsl(parsed.query, keep_blank_values=True))

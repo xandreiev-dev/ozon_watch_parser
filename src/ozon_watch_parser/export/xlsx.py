@@ -18,7 +18,7 @@ def brand_file_name(brand: str) -> str:
 
 def final_output_file_name(run_date: date | None = None) -> str:
     run_date = run_date or date.today()
-    return f"Ozon_watch_ru_{run_date.strftime('%Y%m%d')}.xlsx"
+    return f"Ozon_watch_ru_{run_date.strftime('%Y-%m-%d')}.xlsx"
 
 
 class StreamingXlsxWriter:
