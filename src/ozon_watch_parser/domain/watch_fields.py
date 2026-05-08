@@ -167,6 +167,47 @@ def extract_warranty(title: str, description: str = "") -> str:
     return ""
 
 
+def is_target_watch_product(title: str, description: str = "") -> bool:
+    full = clean_text(f"{title or ''} {description or ''}").lower()
+    if not full:
+        return False
+
+    accessory_patterns = [
+        r"^\s*(чехол|ремешок|стекло|пленк|заряд|кабель)",
+        r"\b(чехол|ремешок|стекло|пленк)\s+(для|на)\b",
+        r"\b(case|strap|screen protector|charger|cable)\s+(for|для)\b",
+    ]
+    band_patterns = [
+        r"\bsmart\s*band\b",
+        r"\bmi\s*band\b",
+        r"\bфитнес[-\s]*браслет\b",
+        r"\bgalaxy\s*fit\s*\d*\b",
+        r"\bhuawei\s*band\b",
+        r"\bhonor\s*band\b",
+        r"\bxiaomi\s*band\b",
+    ]
+    if any(re.search(pattern, full, flags=re.IGNORECASE) for pattern in accessory_patterns):
+        return False
+    if any(re.search(pattern, full, flags=re.IGNORECASE) for pattern in band_patterns):
+        return False
+
+    return bool(re.search(r"\bwatch\b|час[ыо]|смарт[-\s]*час|smart\s*watch", full, flags=re.IGNORECASE))
+
+
+def _model_from_head(title: str, brand_aliases: list[str], line_patterns: list[str]) -> str:
+    head = clean_text((title or "").split(",", 1)[0])
+    lower = head.lower()
+    lower = re.sub(r"\b(смарт[-\s]*часы|умные\s+часы|smart\s+watch|наручные\s+смарт\s+часы)\b", " ", lower)
+    for alias in brand_aliases:
+        lower = re.sub(rf"\b{re.escape(alias)}\b", " ", lower, flags=re.IGNORECASE)
+    lower = clean_text(lower)
+    for pattern in line_patterns:
+        match = re.search(pattern, lower, flags=re.IGNORECASE)
+        if match:
+            return cleanup_model_value(match.group(1))
+    return ""
+
+
 def extract_garmin_model(title: str, description: str = "") -> str:
     lower = clean_text(f"{title or ''} {description or ''}").lower()
     patterns = [
@@ -193,9 +234,114 @@ def extract_garmin_model(title: str, description: str = "") -> str:
     return ""
 
 
+def extract_amazfit_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["amazfit"],
+        [
+            r"((?:t[-\s]?rex|bip|active|balance|gts|gtr|cheetah|falcon|zepp)[a-z0-9®\-\s]*)",
+            r"(a\d{4}\s+[a-z0-9\-\s]+)",
+        ],
+    )
+
+
+def extract_huawei_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["huawei"],
+        [
+            r"((?:watch\s*)?(?:gt|fit|d|ultimate|buds|kids|gt runner)[a-z0-9\-\s]*)",
+            r"(watch\s+[a-z0-9\-\s]+)",
+        ],
+    )
+
+
+def extract_honor_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["honor"],
+        [
+            r"((?:choice\s+)?watch[a-z0-9\-\s]*)",
+            r"(watch\s*\d[a-z0-9\-\s]*)",
+        ],
+    )
+
+
+def extract_samsung_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["samsung"],
+        [
+            r"(galaxy\s+watch\s+ultra[a-z0-9\-\s]*)",
+            r"(galaxy\s+watch\s*\d*[a-z0-9\-\s]*)",
+            r"(watch\s*\d+[a-z0-9\-\s]*)",
+        ],
+    )
+
+
+def extract_xiaomi_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["xiaomi", "redmi"],
+        [
+            r"((?:redmi\s+)?watch\s*[a-z0-9\-\s]*)",
+            r"(s\d+\s*[a-z0-9\-\s]*)",
+        ],
+    )
+
+
+def extract_google_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["google"],
+        [
+            r"(pixel\s+watch\s*\d*[a-z0-9\-\s]*)",
+            r"(watch\s*\d+[a-z0-9\-\s]*)",
+        ],
+    )
+
+
+def extract_oneplus_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["oneplus"],
+        [r"(watch\s*\d*[a-z0-9\-\s]*)"],
+    )
+
+
+def extract_vivo_model(title: str, description: str = "") -> str:
+    return _model_from_head(
+        f"{title or ''} {description or ''}",
+        ["vivo"],
+        [r"(watch\s*[a-z0-9\-\s]*)"],
+    )
+
+
 def extract_apple_model(title: str, description: str = "") -> str:
     lower = clean_text(f"{title or ''} {description or ''}").lower()
     series_group = "|".join(VALID_APPLE_SERIES)
+
+    se_short_match = re.search(r"\bapple\b.*\bse\s*(2|3|2022|2024|2025)?\b", lower, flags=re.IGNORECASE)
+    if se_short_match and "watch" not in lower:
+        raw_version = se_short_match.group(1) or ""
+        if raw_version in {"2", "2022", "2024"}:
+            return "Apple Watch SE 2"
+        if raw_version in {"3", "2025"}:
+            return "Apple Watch SE 3"
+        return "Apple Watch SE"
+
+    watch_s_match = re.search(r"\bwatch\s*s\s*(2|3|4|5|6|7|8|9|10|11)\b", lower, flags=re.IGNORECASE)
+    if watch_s_match:
+        return f"Apple Watch Series {watch_s_match.group(1)}"
+
+    watchs_match = re.search(r"\bwatchs(2|3|4|5|6|7|8|9|10|11)\b", lower, flags=re.IGNORECASE)
+    if watchs_match:
+        return f"Apple Watch Series {watchs_match.group(1)}"
+
+    series_ultra_match = re.search(r"\bwatch\s+series\s+ultra\s*(2|3)?\b", lower, flags=re.IGNORECASE)
+    if series_ultra_match:
+        suffix = series_ultra_match.group(1) or ""
+        return clean_text(f"Apple Watch Ultra {suffix}")
 
     ultra_match = re.search(r"\bwatch\s+ultra\s*(2|3)?\b", lower, flags=re.IGNORECASE)
     if ultra_match:
@@ -270,7 +416,29 @@ def extract_model(title: str, description: str = "") -> str:
     if brand == "Apple":
         return extract_apple_model(title, description)
     if brand == "Garmin":
-        return extract_garmin_model(title, description)
+        return extract_garmin_model(title, description) or _model_from_head(
+            f"{title or ''} {description or ''}",
+            ["garmin"],
+            [
+                r"((?:fenix|forerunner|venu|epix|instinct|lily|tactix|marq|vivomove|vivoactive|approach|enduro|quatix|descent)[a-z0-9®\-\+\s]*)"
+            ],
+        )
+    if brand == "Amazfit":
+        return extract_amazfit_model(title, description)
+    if brand == "Huawei":
+        return extract_huawei_model(title, description)
+    if brand == "Honor":
+        return extract_honor_model(title, description)
+    if brand == "Samsung":
+        return extract_samsung_model(title, description)
+    if brand == "Xiaomi":
+        return extract_xiaomi_model(title, description)
+    if brand == "Google":
+        return extract_google_model(title, description)
+    if brand == "OnePlus":
+        return extract_oneplus_model(title, description)
+    if brand == "vivo":
+        return extract_vivo_model(title, description)
 
     lower = clean_text(f"{title or ''} {description or ''}").lower()
     patterns = [

@@ -25,6 +25,8 @@ async def async_main() -> None:
     parser.add_argument("--brand", choices=sorted(BRAND_URLS.keys()), default=None, help="Парсить только один бренд")
     parser.add_argument("--pages", type=int, default=None)
     parser.add_argument("--min-cards", type=int, default=None)
+    parser.add_argument("--min-price", type=int, default=None)
+    parser.add_argument("--max-price", type=int, default=None)
     parser.add_argument("--export-dir", default=None)
     parser.add_argument("--cdp", dest="use_cdp", action="store_true", default=True)
     parser.add_argument("--no-cdp", dest="use_cdp", action="store_false")
@@ -49,6 +51,8 @@ async def async_main() -> None:
     pages = args.pages if args.pages is not None else app_config.pages
     min_cards = args.min_cards if args.min_cards is not None else app_config.min_cards
     use_brand_min_cards = args.min_cards is None
+    min_price = args.min_price if args.min_price is not None else app_config.min_price
+    max_price = args.max_price if args.max_price is not None else app_config.max_price
     urls_by_brand = app_config.urls_by_brand or {}
 
     if args.once:
@@ -59,6 +63,8 @@ async def async_main() -> None:
             min_cards=min_cards,
             url_override=args.url,
             use_brand_min_cards=use_brand_min_cards,
+            min_price=min_price,
+            max_price=max_price,
         )
         if out_path:
             logging.info("Общий файл сформирован: %s (%s строк)", out_path, rows)
@@ -73,6 +79,8 @@ async def async_main() -> None:
         min_cards=min_cards,
         url_override=args.url,
         use_brand_min_cards=use_brand_min_cards,
+        min_price=min_price,
+        max_price=max_price,
     )
 
 

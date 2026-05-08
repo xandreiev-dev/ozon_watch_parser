@@ -17,6 +17,8 @@ from ozon_watch_parser.utils.url import normalize_ozon_url
 class AppConfig:
     pages: int = 20
     min_cards: int = 200
+    min_price: int = 1000
+    max_price: int = 300000
     export_dir: str = "brand_exports"
     cdp_url: str = "http://localhost:9222"
     auto_launch_chrome: bool = True
@@ -56,6 +58,8 @@ def load_app_config(path: str | Path = "config.toml") -> AppConfig:
     return AppConfig(
         pages=int(parser.get("pages", 20)),
         min_cards=int(parser.get("min_cards", 200)),
+        min_price=int(parser.get("min_price", 1000)),
+        max_price=int(parser.get("max_price", 300000)),
         export_dir=str(parser.get("export_dir", "brand_exports")),
         cdp_url=str(cdp.get("url", "http://localhost:9222")),
         auto_launch_chrome=bool(cdp.get("auto_launch_chrome", True)),

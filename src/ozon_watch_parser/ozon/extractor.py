@@ -15,7 +15,7 @@ EXTRACT_LISTING_JS = r"""
   const cards = document.querySelectorAll('.tile-root');
   const out = [];
   const brandNeedle = (brandHint || '').trim().toLowerCase();
-  const titleNeedle = /Watch|watch|часы|Смарт|смарт|Apple|Samsung|Galaxy|Huawei|HUAWEI|Honor|Garmin|Amazfit|Xiaomi|Redmi|Pixel|OnePlus/i;
+  const titleNeedle = /Watch|watch|часы|Смарт|смарт|smart\s*watch/i;
 
   cards.forEach(card => {
     const link = card.querySelector("a[href*='/product/']");

@@ -64,7 +64,12 @@ def aggregate_brand_exports(
 ) -> tuple[Path | None, int]:
     export_path = Path(export_dir)
     expected_names = {brand_file_name(brand) for brand in BRAND_URLS}
-    files = sorted(path for path in export_path.iterdir() if path.is_file() and path.name in expected_names)
+    existing_files = {path.name: path for path in export_path.iterdir() if path.is_file() and path.name in expected_names}
+    files = [
+        existing_files[brand_file_name(brand)]
+        for brand in BRAND_URLS
+        if brand_file_name(brand) in existing_files
+    ]
     frames: list[pd.DataFrame] = []
 
     for path in files:

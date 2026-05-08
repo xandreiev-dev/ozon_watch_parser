@@ -38,7 +38,13 @@ def normalize_listing_item(
     if not brand and brand_hint:
         brand = BRAND_DISPLAY_NAMES.get(brand_hint, brand_hint.title())
 
-    tax_price = estimate_ozon_like_duty(discount_price or price, source_text, delivery_days)
+    tax_price = estimate_ozon_like_duty(
+        discount_price or price,
+        source_text,
+        delivery_days,
+        full_price=price,
+        discount_price=discount_price,
+    )
 
     return {
         "Название": title,

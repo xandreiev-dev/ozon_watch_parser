@@ -15,6 +15,7 @@ from ozon_watch_parser.domain import normalize_listing_item
 from ozon_watch_parser.export import StreamingXlsxWriter, aggregate_brand_exports, brand_file_name
 from ozon_watch_parser.ozon import ListingExtractor, ListingItem
 from ozon_watch_parser.utils.dates import next_run_at
+from ozon_watch_parser.utils.tax import coerce_price
 from ozon_watch_parser.utils.url import article_from_url, build_page_url, listing_url_variants
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ class OzonWatchParser:
         pages: int,
         min_unique_cards: int,
         seen_articles: set[str],
+        min_price: int = 1000,
+        max_price: int = 300000,
     ) -> pd.DataFrame:
         if not self.extractor:
             await self.setup()
@@ -80,7 +83,17 @@ class OzonWatchParser:
         writer = StreamingXlsxWriter(out_path)
         collected: dict[str, ListingItem] = {}
 
+        def effective_price(item: ListingItem) -> int | None:
+            price = coerce_price(item.price)
+            discount_price = coerce_price(item.discount_price)
+            if price and discount_price and price > discount_price * 3:
+                price = discount_price
+            return discount_price or price
+
         def register(item: ListingItem) -> bool:
+            item_price = effective_price(item)
+            if item_price is None or item_price < min_price or item_price > max_price:
+                return False
             article = article_from_url(item.url)
             if not article or article in seen_articles:
                 return False
@@ -98,6 +111,7 @@ class OzonWatchParser:
                             brand_hint=brand,
                         )
                     )
+            rows = [row for row in rows if row]
             if rows:
                 writer.append_many(rows)
                 logger.info("[%s] Записано +%s новых карточек", brand, len(rows))
@@ -169,6 +183,8 @@ class OzonWatchParser:
         pages: int,
         min_cards: int,
         use_brand_min_cards: bool = True,
+        min_price: int = 1000,
+        max_price: int = 300000,
     ) -> dict[str, int]:
         seen_articles: set[str] = set()
         results: dict[str, int] = {}
@@ -192,6 +208,8 @@ class OzonWatchParser:
                     pages=pages,
                     min_unique_cards=required_cards,
                     seen_articles=seen_articles,
+                    min_price=min_price,
+                    max_price=max_price,
                 )
             except Exception as exc:
                 logger.exception("[%s] Ошибка парсинга бренда, продолжаю следующий", job.brand)
@@ -219,6 +237,8 @@ class OzonWatchParser:
         min_cards: int = 200,
         url_override: str | None = None,
         use_brand_min_cards: bool = True,
+        min_price: int = 1000,
+        max_price: int = 300000,
     ) -> tuple[Path | None, int]:
         self.export_dir.mkdir(parents=True, exist_ok=True)
         jobs = self.build_jobs(
@@ -233,6 +253,8 @@ class OzonWatchParser:
                 pages=pages,
                 min_cards=min_cards,
                 use_brand_min_cards=use_brand_min_cards,
+                min_price=min_price,
+                max_price=max_price,
             )
         finally:
             await self.close()

@@ -2,6 +2,7 @@ from ozon_watch_parser.domain.normalize import normalize_listing_item
 from ozon_watch_parser.ozon.models import ListingItem
 from ozon_watch_parser.config.settings import load_app_config
 from ozon_watch_parser.domain.watch_fields import extract_model
+from ozon_watch_parser.utils.tax import calc_ozon_like_duty, estimate_ozon_like_duty
 from ozon_watch_parser.utils.url import article_from_url, build_page_url
 
 
@@ -42,6 +43,8 @@ def test_load_default_config():
     assert config.urls_by_brand is not None
     assert "apple" in config.urls_by_brand
     assert config.urls_by_brand["apple"] == []
+    assert config.min_price == 1000
+    assert config.max_price == 300000
 
 
 def test_extract_ozon_apple_model_formats():
@@ -53,4 +56,44 @@ def test_extract_ozon_apple_model_formats():
     assert (
         extract_model("Apple Смарт-часы Watch Ultra 3, 49mm, Black Titanium Case")
         == "Apple Watch Ultra 3"
+    )
+
+
+def test_calc_ozon_like_duty_uses_200_eur_threshold_and_ozon_charge():
+    assert calc_ozon_like_duty(30000, eur_rate=95) == 2339
+    assert calc_ozon_like_duty(18000, eur_rate=95) is None
+
+
+def test_estimate_ozon_like_duty_uses_delivery_discount_and_global_signals():
+    tax_price = estimate_ozon_like_duty(
+        30000,
+        "Huawei Watch Global",
+        delivery_days=12,
+        full_price=35000,
+        discount_price=30000,
+        eur_rate=95,
+    )
+
+    assert tax_price == 2339
+    assert (
+        estimate_ozon_like_duty(
+            30000,
+            "Huawei Watch EAC",
+            delivery_days=12,
+            full_price=35000,
+            discount_price=30000,
+            eur_rate=95,
+        )
+        is None
+    )
+    assert (
+        estimate_ozon_like_duty(
+            30000,
+            "Huawei Watch",
+            delivery_days=4,
+            full_price=35000,
+            discount_price=30000,
+            eur_rate=95,
+        )
+        is None
     )
