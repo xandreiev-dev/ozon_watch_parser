@@ -27,6 +27,12 @@ async def async_main() -> None:
     parser.add_argument("--min-cards", type=int, default=None)
     parser.add_argument("--min-price", type=int, default=None)
     parser.add_argument("--max-price", type=int, default=None)
+    parser.add_argument(
+        "--include-rating-sort",
+        action="store_true",
+        default=None,
+        help="Добавить третий обход URL с sorting=rating",
+    )
     parser.add_argument("--export-dir", default=None)
     parser.add_argument("--cdp", dest="use_cdp", action="store_true", default=True)
     parser.add_argument("--no-cdp", dest="use_cdp", action="store_false")
@@ -53,6 +59,11 @@ async def async_main() -> None:
     use_brand_min_cards = args.min_cards is None
     min_price = args.min_price if args.min_price is not None else app_config.min_price
     max_price = args.max_price if args.max_price is not None else app_config.max_price
+    include_rating_sort = (
+        app_config.include_rating_sort
+        if args.include_rating_sort is None
+        else args.include_rating_sort
+    )
     urls_by_brand = app_config.urls_by_brand or {}
 
     if args.once:
@@ -65,6 +76,7 @@ async def async_main() -> None:
             use_brand_min_cards=use_brand_min_cards,
             min_price=min_price,
             max_price=max_price,
+            include_rating_sort=include_rating_sort,
         )
         if out_path:
             logging.info("Общий файл сформирован: %s (%s строк)", out_path, rows)
@@ -81,6 +93,7 @@ async def async_main() -> None:
         use_brand_min_cards=use_brand_min_cards,
         min_price=min_price,
         max_price=max_price,
+        include_rating_sort=include_rating_sort,
     )
 
 

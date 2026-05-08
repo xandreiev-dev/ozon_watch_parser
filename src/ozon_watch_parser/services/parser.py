@@ -69,6 +69,7 @@ class OzonWatchParser:
         seen_articles: set[str],
         min_price: int = 1000,
         max_price: int = 300000,
+        include_rating_sort: bool = False,
     ) -> pd.DataFrame:
         if not self.extractor:
             await self.setup()
@@ -118,7 +119,7 @@ class OzonWatchParser:
 
         try:
             for base_url in source_urls:
-                for source_url in listing_url_variants(base_url):
+                for source_url in listing_url_variants(base_url, include_rating=include_rating_sort):
                     logger.info("[%s] Источник URL: %s", brand, source_url)
                     page_no_growth_streak = 0
                     for page_num in range(1, pages + 1):
@@ -185,6 +186,7 @@ class OzonWatchParser:
         use_brand_min_cards: bool = True,
         min_price: int = 1000,
         max_price: int = 300000,
+        include_rating_sort: bool = False,
     ) -> dict[str, int]:
         seen_articles: set[str] = set()
         results: dict[str, int] = {}
@@ -210,6 +212,7 @@ class OzonWatchParser:
                     seen_articles=seen_articles,
                     min_price=min_price,
                     max_price=max_price,
+                    include_rating_sort=include_rating_sort,
                 )
             except Exception as exc:
                 logger.exception("[%s] Ошибка парсинга бренда, продолжаю следующий", job.brand)
@@ -239,6 +242,7 @@ class OzonWatchParser:
         use_brand_min_cards: bool = True,
         min_price: int = 1000,
         max_price: int = 300000,
+        include_rating_sort: bool = False,
     ) -> tuple[Path | None, int]:
         self.export_dir.mkdir(parents=True, exist_ok=True)
         jobs = self.build_jobs(
@@ -255,6 +259,7 @@ class OzonWatchParser:
                 use_brand_min_cards=use_brand_min_cards,
                 min_price=min_price,
                 max_price=max_price,
+                include_rating_sort=include_rating_sort,
             )
         finally:
             await self.close()

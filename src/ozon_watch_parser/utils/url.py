@@ -30,7 +30,7 @@ def article_from_url(url: str) -> str:
     return match.group(1) if match else ""
 
 
-def listing_url_variants(base_url: str) -> list[str]:
+def listing_url_variants(base_url: str, include_rating: bool = False) -> list[str]:
     variants = [base_url]
     parsed = urlparse(base_url)
     params = dict(parse_qsl(parsed.query, keep_blank_values=True))
@@ -40,7 +40,7 @@ def listing_url_variants(base_url: str) -> list[str]:
         by_price["sorting"] = "price"
         variants.append(parsed._replace(query=urlencode(by_price)).geturl())
 
-    if params.get("sorting") != "rating":
+    if include_rating and params.get("sorting") != "rating":
         by_rating = dict(params)
         by_rating["sorting"] = "rating"
         variants.append(parsed._replace(query=urlencode(by_rating)).geturl())

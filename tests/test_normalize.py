@@ -3,7 +3,7 @@ from ozon_watch_parser.ozon.models import ListingItem
 from ozon_watch_parser.config.settings import load_app_config
 from ozon_watch_parser.domain.watch_fields import extract_model
 from ozon_watch_parser.utils.tax import calc_ozon_like_duty, estimate_ozon_like_duty
-from ozon_watch_parser.utils.url import article_from_url, build_page_url
+from ozon_watch_parser.utils.url import article_from_url, build_page_url, listing_url_variants
 
 
 def test_article_from_ozon_url():
@@ -14,6 +14,24 @@ def test_build_page_url_replaces_page():
     url = build_page_url("https://www.ozon.ru/category/smart-chasy-15516/?sorting=price&page=2", 5)
     assert "page=5" in url
     assert "sorting=price" in url
+
+
+def test_listing_url_variants_uses_two_passes_by_default():
+    variants = listing_url_variants("https://www.ozon.ru/category/smart-chasy-15516/?text=watch")
+
+    assert len(variants) == 2
+    assert "sorting=price" in variants[1]
+    assert all("sorting=rating" not in variant for variant in variants)
+
+
+def test_listing_url_variants_can_include_rating_pass():
+    variants = listing_url_variants(
+        "https://www.ozon.ru/category/smart-chasy-15516/?text=watch",
+        include_rating=True,
+    )
+
+    assert len(variants) == 3
+    assert any("sorting=rating" in variant for variant in variants)
 
 
 def test_normalize_apple_watch_item():
