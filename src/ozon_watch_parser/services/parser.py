@@ -77,6 +77,7 @@ class OzonWatchParser:
         out_path = self.export_dir / brand_file_name(brand)
         if out_path.exists():
             if self._export_has_rows(out_path):
+                # Resume-режим: уже собранный бренд не парсим повторно при перезапуске.
                 logger.warning("[%s] Файл %s уже существует, пропускаю бренд", brand, out_path.name)
                 return pd.DataFrame()
             logger.warning("[%s] Файл %s пустой, перезаписываю", brand, out_path.name)
@@ -96,6 +97,7 @@ class OzonWatchParser:
             if item_price is None or item_price < min_price or item_price > max_price:
                 return False
             article = article_from_url(item.url)
+            # Article используем как главный ключ дедупликации между всеми брендами и сортировками.
             if not article or article in seen_articles:
                 return False
             seen_articles.add(article)
@@ -140,6 +142,7 @@ class OzonWatchParser:
                         if len(collected) >= min_unique_cards:
                             break
                         if page_no_growth_streak >= 3:
+                            # Не тратим время на хвост пагинации, если несколько страниц подряд не дают новых Article.
                             logger.info(
                                 "[%s] 3 страницы подряд без новых карточек, перехожу дальше",
                                 brand,
@@ -188,6 +191,7 @@ class OzonWatchParser:
         max_price: int = 300000,
         include_rating_sort: bool = False,
     ) -> dict[str, int]:
+        # Общий seen нужен, чтобы один товар не попал в итог из разных брендовых ссылок/сортировок.
         seen_articles: set[str] = set()
         results: dict[str, int] = {}
 

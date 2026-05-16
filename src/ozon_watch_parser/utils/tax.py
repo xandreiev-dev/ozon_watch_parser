@@ -40,6 +40,7 @@ GLOBAL_MARKERS = (
 
 @lru_cache(maxsize=1)
 def get_eur_rate(timeout: int = 8) -> float:
+    # Курс кешируем на запуск: для всего файла достаточно одного значения EUR.
     try:
         response = requests.get(
             CBR_DAILY_JSON_URL,
@@ -70,6 +71,7 @@ def is_global_text(text: str) -> str:
 
 
 def calc_ozon_like_duty(price_rub: int | float, eur_rate: float | None = None) -> int | None:
+    # Приближенная формула Ozon Global: 15% сверх 200 EUR + сервисный сбор Ozon.
     threshold_rub = DUTY_FREE_THRESHOLD_EUR * (eur_rate or get_eur_rate())
     over = float(price_rub) - threshold_rub
     if over <= 0:
@@ -112,6 +114,7 @@ def estimate_ozon_like_duty(
 
     has_global_marker = any(marker in lower for marker in GLOBAL_MARKERS)
 
+    # Быстрая доставка и маленькая скидка обычно означают локальный товар без пошлины.
     if delivery_days <= 10 and discount_ratio <= 0.10:
         return None
 
@@ -119,6 +122,7 @@ def estimate_ozon_like_duty(
         return calc_ozon_like_duty(discount, eur_rate=eur_rate)
 
     duty_signals = 0
+    # Пошлину считаем только при сочетании признаков, чтобы не завышать локальные товары.
     if has_global_marker:
         duty_signals += 1
     if delivery_days >= 7:

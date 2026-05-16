@@ -6,6 +6,7 @@ def normalize_ozon_url(url: str) -> str:
     if not url:
         return ""
     parsed = urlparse(url.strip())
+    # Ссылки из казахстанской выдачи приводим к российскому домену, регион затем выставляется через UI.
     if parsed.netloc.lower() in {"ozon.kz", "www.ozon.kz"}:
         parsed = parsed._replace(scheme="https", netloc="www.ozon.ru")
     elif parsed.netloc.lower() == "ozon.ru":
@@ -35,12 +36,14 @@ def listing_url_variants(base_url: str, include_rating: bool = False) -> list[st
     parsed = urlparse(base_url)
     params = dict(parse_qsl(parsed.query, keep_blank_values=True))
 
+    # Основной быстрый режим: исходная ссылка + сортировка по цене.
     if params.get("sorting") != "price":
         by_price = dict(params)
         by_price["sorting"] = "price"
         variants.append(parsed._replace(query=urlencode(by_price)).geturl())
 
     if include_rating and params.get("sorting") != "rating":
+        # rating заметно замедляет прогон, поэтому включается только для контрольного полного сбора.
         by_rating = dict(params)
         by_rating["sorting"] = "rating"
         variants.append(parsed._replace(query=urlencode(by_rating)).geturl())

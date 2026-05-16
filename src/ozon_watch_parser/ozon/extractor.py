@@ -12,6 +12,7 @@ from .models import ListingItem
 
 EXTRACT_LISTING_JS = r"""
 (brandHint = '') => {
+  // Читаем только видимые карточки листинга: Ozon подгружает их во время прокрутки.
   const cards = document.querySelectorAll('.tile-root');
   const out = [];
   const brandNeedle = (brandHint || '').trim().toLowerCase();
@@ -38,6 +39,7 @@ EXTRACT_LISTING_JS = r"""
       }
     }
     if (!title) {
+      // Иногда нормальное название есть только в aria/title у ссылки товара.
       const aria = link.getAttribute('aria-label') || link.getAttribute('title') || '';
       if (aria && titleNeedle.test(aria)) title = aria.trim();
     }
@@ -113,6 +115,7 @@ class ListingExtractor:
         return any(marker in message for marker in transient_markers)
 
     async def _wait_for_body(self, attempts: int = 6) -> bool:
+        # На Ozon контекст страницы часто пересоздается во время навигации, поэтому ждём body с ретраями.
         for _ in range(attempts):
             try:
                 ready = await self.page.evaluate("() => Boolean(document.body)")
@@ -175,6 +178,7 @@ class ListingExtractor:
             pass
 
         async def extract_items(retries: int = 3) -> list[ListingItem]:
+            # evaluate может упасть на перерисовке Ozon; короткий retry безопаснее, чем ронять бренд.
             last_error = None
             for attempt in range(1, retries + 1):
                 try:
@@ -205,6 +209,7 @@ class ListingExtractor:
         items: list[ListingItem] = []
         empty_growth_streak = 0
 
+        # Прокручиваем до стабилизации: если новые URL перестали появляться, считаем страницу исчерпанной.
         for _ in range(max_scrolls):
             try:
                 await self.page.mouse.wheel(0, 600)

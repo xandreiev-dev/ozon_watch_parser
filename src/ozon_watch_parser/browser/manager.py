@@ -26,6 +26,7 @@ OZON_GEOLOCATION_ORIGIN = "https://www.ozon.ru"
 MOSCOW_LOCATION_QUERY = "141-99-90"
 
 
+# Минимальный stealth-скрипт нужен для fallback-режима без CDP.
 STEALTH_INIT_SCRIPT = r"""
 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 Object.defineProperty(navigator, 'languages', { get: () => ['ru-RU', 'ru', 'en'] });
@@ -96,6 +97,7 @@ class BrowserManager:
         chrome = self.chrome_executable()
         if not chrome:
             raise RuntimeError("Chrome не найден в стандартных путях установки")
+        # Отдельный профиль не смешивает парсерную сессию с обычным Chrome пользователя.
         profile_dir = Path(tempfile.gettempdir()) / "chrome-cdp-ozon-watch"
         profile_dir.mkdir(parents=True, exist_ok=True)
         port = urlparse(self.settings.cdp_url).port or 9222
@@ -139,6 +141,7 @@ class BrowserManager:
 
         logger.info("Подключаюсь к Chrome через CDP: %s", self.settings.cdp_url)
         self.browser = await self.playwright.chromium.connect_over_cdp(self.settings.cdp_url)
+        # В CDP-режиме стараемся использовать уже открытый контекст с живыми cookies Ozon.
         self.context = self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
         await self.apply_moscow_geolocation()
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
@@ -202,6 +205,7 @@ class BrowserManager:
                 pass
             await asyncio.sleep(0.35)
 
+        # Регион выставляем именно через интерфейс Ozon, иначе цены и доставка могут быть не московскими.
         opener_candidates = (
             self.page.get_by_role(
                 "button",
@@ -335,6 +339,7 @@ class BrowserManager:
         pid = self.chrome_process.pid if self.chrome_process else None
         if pid:
             try:
+                # Закрываем только Chrome, который был запущен самим парсером.
                 subprocess.run(
                     ["taskkill", "/PID", str(pid), "/T", "/F"],
                     check=False,
